@@ -37,7 +37,6 @@ export default async function Home({ searchParams }:{
 
   const url = Array.isArray(urlParam) ? urlParam[0] : urlParam;
 
-  // Validate and clean the URL
   const cleanUrl = url.trim();
   if (!cleanUrl.startsWith('https://')) {
     return (
