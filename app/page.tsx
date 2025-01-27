@@ -37,27 +37,74 @@ export default async function Home({ searchParams }:{
 
   const url = Array.isArray(urlParam) ? urlParam[0] : urlParam;
 
+  // Validate and clean the URL
+  const cleanUrl = url.trim();
+  if (!cleanUrl.startsWith('https://')) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen">
+        <Navbar />
+        <div className="text-red-500 mt-8">
+          <p>Error: Please provide a valid HTTPS URL</p>
+          <Link href="/" className="text-blue-500 hover:underline mt-4 block">
+            Return to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if URL is supported
+  const isTikTok = cleanUrl.includes('tiktok.com');
+  const isInstagram = cleanUrl.includes('instagram.com');
+  const isYouTube = cleanUrl.includes('youtu.be') || cleanUrl.includes('youtube.com');
+
+  if (!isTikTok && !isInstagram && !isYouTube) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen">
+        <Navbar />
+        <div className="text-red-500 mt-8">
+          <p>Error: Only TikTok, Instagram, and YouTube URLs are supported</p>
+          <Link href="/" className="text-blue-500 hover:underline mt-4 block">
+            Return to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const options = {
     method: 'POST',
     headers: {
       'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY || '',
       'X-RapidAPI-Host': 'snap-video3.p.rapidapi.com',
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: JSON.stringify({ url }),
+    body: new URLSearchParams({
+      url: cleanUrl
+    }).toString()
   };
 
   let post = null;
 
   try {
+    console.log('Making API request with URL:', cleanUrl); // Debug log
     const response = await fetch('https://snap-video3.p.rapidapi.com/download', options);
     
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      const errorData = await response.json().catch(() => null);
+      console.error('API Error Response:', errorData); // Debug log
+      throw new Error(
+        errorData?.message || 
+        `API Error: ${response.status} ${response.statusText}`
+      );
     }
   
     post = await response.json();
     console.log('API Response:', post); // Debug log
+
+    if (!post || typeof post !== 'object') {
+      throw new Error('Invalid response format from API');
+    }
   } catch (error) {
     console.error('Error fetching video details:', error); 
     return (
@@ -100,19 +147,19 @@ export default async function Home({ searchParams }:{
                   {post.duration && (
                     <div className="flex items-center gap-2">
                       <span className="text-blue-400 font-semibold">Duration:</span>
-                      <span>{formatDuration(post.duration)}</span>
+                      <span>{post.duration}</span>
                     </div>
                   )}
                   {post.source && (
                     <div className="flex items-center gap-2">
                       <span className="text-blue-400 font-semibold">Source:</span>
-                      <span>{post.source}</span>
+                      <span className="capitalize">{post.source}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
                     <span className="text-blue-400 font-semibold">Original:</span>
                     <a
-                      href={url}
+                      href={cleanUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-white hover:underline"
@@ -127,7 +174,7 @@ export default async function Home({ searchParams }:{
               <div className="flex-shrink-0 w-full md:w-auto">
                 <h3 className="text-lg font-semibold mb-4 text-blue-400">Download Options</h3>
                 <div className="flex flex-col gap-3">
-                  {post.medias && Object.values(post.medias).map((media: any, index: number) => (
+                  {post.medias && post.medias.map((media: any, index: number) => (
                     <a
                       key={index}
                       href={media?.url}
@@ -143,7 +190,7 @@ export default async function Home({ searchParams }:{
                         <DownloadLogo />
                         <span className="font-bold">
                           {media?.quality || "Download"}
-                          {media?.size && ` (${media.size})`}
+                          {media?.formattedSize && ` (${media.formattedSize})`}
                         </span>
                       </HoverBorderGradient>
                     </a>
